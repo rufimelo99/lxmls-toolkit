@@ -4,7 +4,6 @@ import lxmls.classifiers.linear_classifier as lc
 
 
 class Perceptron(lc.LinearClassifier):
-
     def __init__(self, nr_epochs=10, learning_rate=1, averaged=True):
         lc.LinearClassifier.__init__(self)
         self.trained = False
@@ -21,7 +20,6 @@ class Perceptron(lc.LinearClassifier):
         nr_c = np.unique(y).shape[0]
         w = np.zeros((nr_f, nr_c))
         for epoch_nr in range(self.nr_epochs):
-
             # use seed to generate permutation
             np.random.seed(seed)
             perm = np.random.permutation(nr_x)
@@ -30,18 +28,26 @@ class Perceptron(lc.LinearClassifier):
             seed += 1
 
             for nr in range(nr_x):
-                # print "iter %i" %( epoch_nr*nr_x + nr)
-                inst = perm[nr]
-                y_hat = self.get_label(x[inst:inst+1, :], w)
+                iteraction = ( epoch_nr*nr_x + nr)
+                if iteraction % 5 == 0:
+                    #print("Iteration: %i" % iteraction)
+                    #save the current w
+                    self.params_per_round.append(w.copy())
 
-                if y[inst:inst+1, 0] != y_hat:
+                inst = perm[nr]
+                y_hat = self.get_label(x[inst : inst + 1, :], w)
+
+                if y[inst : inst + 1, 0] != y_hat:
                     # Increase features of th e truth
-                    w[:, y[inst:inst+1, 0]] += self.learning_rate * x[inst:inst+1, :].transpose()
+                    w[:, y[inst : inst + 1, 0]] += (
+                        self.learning_rate * x[inst : inst + 1, :].transpose()
+                    )
 
                     # Decrease features of the prediction
-                    w[:, y_hat] += -1 * self.learning_rate * x[inst:inst+1, :].transpose()
+                    w[:, y_hat] += (
+                        -1 * self.learning_rate * x[inst : inst + 1, :].transpose()
+                    )
 
-            self.params_per_round.append(w.copy())
             self.trained = True
             y_pred = self.test(x_orig, w)
             acc = self.evaluate(y, y_pred)
