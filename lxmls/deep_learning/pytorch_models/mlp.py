@@ -1,12 +1,12 @@
+from __future__ import division
 import numpy as np
 import torch
+from torch.autograd import Variable
 from lxmls.deep_learning.mlp import MLP
 
 
-def cast_float(variable_np):
-    variable = torch.from_numpy(variable_np).float()
-    variable.requires_grad = True
-    return variable
+def cast_float(variable):
+    return Variable(torch.from_numpy(variable).float(), requires_grad=True)
 
 
 class PytorchMLP(MLP):
@@ -29,8 +29,7 @@ class PytorchMLP(MLP):
             self.parameters[n] = [cast_float(weight), cast_float(bias)]
 
         # Initialize some functions that we will need
-        self.log_softmax = torch.nn.LogSoftmax(dim=1)
-        self.loss_function = torch.nn.NLLLoss()
+        self.logsoftmax = torch.nn.LogSoftmax(dim=1)
 
     # TODO: Move these outside fo the class as in the numpy case
     def _log_forward(self, input):
@@ -48,7 +47,7 @@ class PytorchMLP(MLP):
         # Solution to Exercise 6.4
         for n in range(self.num_layers - 1):
 
-            # Get weights and bias of the layer (even and odd positions)
+            # Get weigths and bias of the layer (even and odd positions)
             weight, bias = self.parameters[n]
 
             # Linear transformation
@@ -57,14 +56,14 @@ class PytorchMLP(MLP):
             # Non-linear transformation
             tilde_z = torch.sigmoid(z)
 
-        # Get weights and bias of the layer (even and odd positions)
+        # Get weigths and bias of the layer (even and odd positions)
         weight, bias = self.parameters[self.num_layers - 1]
 
         # Linear transformation
         z = torch.matmul(tilde_z, torch.t(weight)) + bias
 
         # Softmax is computed in log-domain to prevent underflow/overflow
-        log_tilde_z = self.log_softmax(z)
+        log_tilde_z = self.logsoftmax(z)
 
         # End of solution to Exercise 6.4
         # ----------
@@ -76,11 +75,14 @@ class PytorchMLP(MLP):
         Computes the gradients of the network with respect to cross entropy
         error cost
         """
-        true_class = torch.from_numpy(output).long()
+        true_class = Variable(
+            torch.from_numpy(output).long(),
+            requires_grad=False
+        )
 
         # Compute negative log-likelihood loss
         _log_forward = self._log_forward(input)
-        loss = self.loss_function(_log_forward, true_class)
+        loss = torch.nn.NLLLoss()(_log_forward, true_class)
         # Use autograd to compute the backward pass.
         loss.backward()
 
@@ -95,7 +97,7 @@ class PytorchMLP(MLP):
         Predict model outputs given input
         """
         log_forward = self._log_forward(input).data.numpy()
-        return np.argmax(log_forward, axis=1)
+        return np.argmax(np.exp(log_forward), axis=1)
 
     def update(self, input=None, output=None):
         """
@@ -104,14 +106,14 @@ class PytorchMLP(MLP):
         gradients = self.gradients(input, output)
         learning_rate = self.config['learning_rate']
         # Update each parameter with SGD rule
-        for m in range(self.num_layers):
+        for m in np.arange(self.num_layers):
             # Update weight
             self.parameters[m][0].data -= learning_rate * gradients[m][0]
             # Update bias
             self.parameters[m][1].data -= learning_rate * gradients[m][1]
 
         # Zero gradients
-        for n in range(self.num_layers):
+        for n in np.arange(self.num_layers):
             weight, bias = self.parameters[n]
             weight.grad.data.zero_()
             bias.grad.data.zero_()
